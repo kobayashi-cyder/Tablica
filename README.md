@@ -160,7 +160,7 @@ if x > 20 {
 
 ```bash
 # Compile and run
-tablica example.tab
+tablica example.mtab
 ```
 
 ---
