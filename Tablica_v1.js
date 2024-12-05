@@ -1,4 +1,5 @@
 // 字句解析 (Lexer)
+// Lexer (修正版)
 class Lexer {
     constructor(sourceCode) {
         this.sourceCode = sourceCode;
@@ -22,7 +23,13 @@ class Lexer {
             } else if (char === '*' && this.sourceCode[this.currentIndex + 1] === '*') {
                 this.tokens.push({ type: 'OPERATOR', value: '**' });
                 this.currentIndex += 2;
-            } else if (['<', '>', '=', '!'].includes(char) &&
+            } else if (char === '=' && this.sourceCode[this.currentIndex + 1] === '=') {
+                this.tokens.push({ type: 'COMPARATOR', value: '==' });
+                this.currentIndex += 2;
+            } else if (char === '=' && this.sourceCode[this.currentIndex + 1] !== '=') {
+                this.tokens.push({ type: 'EQUALS', value: '=' });
+                this.currentIndex++;
+            } else if (['<', '>', '!', '='].includes(char) &&
                        this.sourceCode[this.currentIndex + 1] === '=') {
                 this.tokens.push({ type: 'COMPARATOR', value: char + '=' });
                 this.currentIndex += 2;
