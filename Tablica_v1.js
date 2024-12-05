@@ -146,6 +146,124 @@ class Parser {
     }
 }
 
+class CodeGenerator {
+    constructor(ast) {
+        this.ast = ast;
+        this.bytecode = [];
+    }
+
+    generate() {
+        this._traverse(this.ast.body);
+        return this.bytecode;
+    }
+
+    _traverse(statements) {
+        for (const statement of statements) {
+            if (statement.type === 'Assignment') {
+                this._generateAssignment(statement);
+            }
+        }
+    }
+
+    _generateAssignment(statement) {
+        this._generateExpression(statement.value);
+        this.bytecode.push({ opcode: 'STORE', operand: statement.identifier });
+    }
+
+    _generateExpression(expression) {
+        if (expression.type === 'Literal') {
+            this.bytecode.push({ opcode: 'LOAD', operand: expression.value });
+        } else if (expression.type === 'BinaryExpression') {
+            this._generateExpression(expression.left);
+            this._generateExpression(expression.right);
+            this.bytecode.push({ opcode: this._getOpcode(expression.operator) });
+        }
+    }
+
+    _getOpcode(operator) {
+        switch (operator) {
+            case '+': return 'ADD';
+            case '-': return 'SUB';
+            case '*': return 'MUL';
+            case '/': return 'DIV';
+            default: throw new Error(`Unsupported operator: ${operator}`);
+        }
+    }
+}
+
+class VirtualMachine {
+    constructor(bytecode) {
+        this.bytecode = bytecode;
+        this.stack = [];
+        this.variables = {};
+    }
+
+    execute() {
+        for (const instruction of this.bytecode) {
+            switch (instruction.opcode) {
+                case 'LOAD':
+                    if (typeof instruction.operand === 'string') {
+                        // 変数の値をロード
+                        if (instruction.operand in this.variables) {
+                            this.stack.push(this.variables[instruction.operand]);
+                        } else {
+                            throw new Error(`Undefined variable: ${instruction.operand}`);
+                        }
+                    } else {
+                        // リテラル値をロード
+                        this.stack.push(instruction.operand);
+                    }
+                    break;
+
+                case 'STORE':
+                    // スタックのトップを変数に保存
+                    const valueToStore = this.stack.pop();
+                    if (valueToStore === undefined) {
+                        throw new Error("Nothing to store in variable");
+                    }
+                    this.variables[instruction.operand] = valueToStore;
+                    break;
+
+                case 'ADD':
+                    if (this.stack.length < 2) throw new Error("Not enough values on the stack for ADD");
+                    const addRight = this.stack.pop();
+                    const addLeft = this.stack.pop();
+                    this.stack.push(addLeft + addRight);
+                    break;
+
+                case 'SUB':
+                    if (this.stack.length < 2) throw new Error("Not enough values on the stack for SUB");
+                    const subRight = this.stack.pop();
+                    const subLeft = this.stack.pop();
+                    this.stack.push(subLeft - subRight);
+                    break;
+
+                case 'MUL':
+                    if (this.stack.length < 2) throw new Error("Not enough values on the stack for MUL");
+                    const mulRight = this.stack.pop();
+                    const mulLeft = this.stack.pop();
+                    this.stack.push(mulLeft * mulRight);
+                    break;
+
+                case 'DIV':
+                    if (this.stack.length < 2) throw new Error("Not enough values on the stack for DIV");
+                    const divRight = this.stack.pop();
+                    const divLeft = this.stack.pop();
+                    if (divRight === 0) {
+                        throw new Error("Division by zero");
+                    }
+                    this.stack.push(divLeft / divRight);
+                    break;
+
+                default:
+                    throw new Error(`Unknown opcode: ${instruction.opcode}`);
+            }
+        }
+        return this.variables;
+    }
+}
+
+
 // テストコード
 const sourceCode = "x = 42; y = x + 1 * 3 - 2 / 1;";
 const lexer = new Lexer(sourceCode);
@@ -155,3 +273,13 @@ console.log("Tokens:", tokens);
 const parser = new Parser(tokens);
 const ast = parser.parse();
 console.log("AST:", JSON.stringify(ast, null, 2));
+
+// 仮想命令セット生成
+const codeGenerator = new CodeGenerator(ast);
+const bytecode = codeGenerator.generate();
+console.log("Bytecode:", bytecode);
+
+// 仮想マシン実行
+const vm = new VirtualMachine(bytecode);
+const result = vm.execute();
+console.log("Execution Result:", result);
