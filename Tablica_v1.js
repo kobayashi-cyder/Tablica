@@ -1,5 +1,4 @@
 // 字句解析 (Lexer)
-// Lexer (修正版)
 class Lexer {
     constructor(sourceCode) {
         this.sourceCode = sourceCode;
@@ -95,12 +94,11 @@ class Parser {
         }
         const value = this._parseExpression();
 
-        // セミコロンのチェック
         if (this.currentIndex >= this.tokens.length || this.tokens[this.currentIndex].type !== 'SEMICOLON') {
             throw new Error("Expected ';'");
         }
 
-        this.currentIndex++; // セミコロンを消費
+        this.currentIndex++;
         return { type: 'Assignment', identifier: identifier.value, value: value };
     }
 
@@ -108,7 +106,6 @@ class Parser {
         return this._parseAddSub();
     }
 
-    // 優先順位: +, -
     _parseAddSub() {
         let left = this._parseMulDivMod();
 
@@ -124,29 +121,12 @@ class Parser {
         return left;
     }
 
-    // 優先順位: *, /, %
     _parseMulDivMod() {
-        let left = this._parsePower();
-
-        while (
-            this.currentIndex < this.tokens.length &&
-            ['*', '/', '%'].includes(this.tokens[this.currentIndex].value)
-        ) {
-            const operator = this.tokens[this.currentIndex++].value;
-            const right = this._parsePower();
-            left = { type: 'BinaryExpression', operator: operator, left: left, right: right };
-        }
-
-        return left;
-    }
-
-    // 優先順位: **
-    _parsePower() {
         let left = this._parsePrimary();
 
         while (
             this.currentIndex < this.tokens.length &&
-            this.tokens[this.currentIndex].value === '**'
+            ['*', '/', '%'].includes(this.tokens[this.currentIndex].value)
         ) {
             const operator = this.tokens[this.currentIndex++].value;
             const right = this._parsePrimary();
@@ -158,6 +138,7 @@ class Parser {
 
     _parsePrimary() {
         const token = this.tokens[this.currentIndex++];
+        console.log("Parsing Primary Token:", token); // デバッグ出力
         if (token.type === 'NUMBER' || token.type === 'IDENTIFIER') {
             return { type: 'Literal', value: token.value };
         }
@@ -165,128 +146,12 @@ class Parser {
     }
 }
 
-// 仮想命令セット生成 (Code Generator)
-class CodeGenerator {
-    constructor(ast) {
-        this.ast = ast;
-        this.bytecode = [];
-    }
-
-    generate() {
-        this._traverse(this.ast.body);
-        return this.bytecode;
-    }
-
-    _traverse(statements) {
-        for (const statement of statements) {
-            if (statement.type === 'Assignment') {
-                this._generateAssignment(statement);
-            }
-        }
-    }
-
-    _generateAssignment(statement) {
-        this._generateExpression(statement.value);
-        this.bytecode.push({ opcode: 'STORE', operand: statement.identifier });
-    }
-
-    _generateExpression(expression) {
-        if (expression.type === 'Literal') {
-            this.bytecode.push({ opcode: 'LOAD', operand: expression.value });
-        } else if (expression.type === 'BinaryExpression') {
-            this._generateExpression(expression.left);
-            this._generateExpression(expression.right);
-            this.bytecode.push({ opcode: this._getOpcode(expression.operator) });
-        }
-    }
-
-    _getOpcode(operator) {
-        switch (operator) {
-            case '+': return 'ADD';
-            case '-': return 'SUB';
-            case '*': return 'MUL';
-            case '/': return 'DIV';
-            case '%': return 'MOD';
-            case '**': return 'POW';
-            default: throw new Error(`Unsupported operator: ${operator}`);
-        }
-    }
-}
-
-// 仮想マシン (VM)
-class VirtualMachine {
-    constructor(bytecode) {
-        this.bytecode = bytecode;
-        this.stack = [];
-        this.variables = {};
-    }
-
-    execute() {
-        for (const instruction of this.bytecode) {
-            switch (instruction.opcode) {
-                case 'LOAD':
-                    if (typeof instruction.operand === 'string') {
-                        if (instruction.operand in this.variables) {
-                            this.stack.push(this.variables[instruction.operand]);
-                        } else {
-                            throw new Error(`Undefined variable: ${instruction.operand}`);
-                        }
-                    } else {
-                        this.stack.push(instruction.operand);
-                    }
-                    break;
-                case 'STORE':
-                    this.variables[instruction.operand] = this.stack.pop();
-                    break;
-                case 'ADD':
-                    this.stack.push(this.stack.pop() + this.stack.pop());
-                    break;
-                case 'SUB':
-                    const subRight = this.stack.pop();
-                    this.stack.push(this.stack.pop() - subRight);
-                    break;
-                case 'MUL':
-                    this.stack.push(this.stack.pop() * this.stack.pop());
-                    break;
-                case 'DIV':
-                    const divRight = this.stack.pop();
-                    this.stack.push(this.stack.pop() / divRight);
-                    break;
-                case 'MOD':
-                    const modRight = this.stack.pop();
-                    this.stack.push(this.stack.pop() % modRight);
-                    break;
-                case 'POW':
-                    const powRight = this.stack.pop();
-                    this.stack.push(this.stack.pop() ** powRight);
-                    break;
-                default:
-                    throw new Error(`Unknown opcode: ${instruction.opcode}`);
-            }
-        }
-        return this.variables;
-    }
-}
-
 // テストコード
-const sourceCode = "x = 42; y = x ** 2 + 3 % 2;";
-
-// 字句解析
+const sourceCode = "x = 42; y = x + 1 * 3 - 2 / 1;";
 const lexer = new Lexer(sourceCode);
 const tokens = lexer.tokenize();
 console.log("Tokens:", tokens);
 
-// 構文解析
 const parser = new Parser(tokens);
 const ast = parser.parse();
 console.log("AST:", JSON.stringify(ast, null, 2));
-
-// 仮想命令セット生成
-const codeGenerator = new CodeGenerator(ast);
-const bytecode = codeGenerator.generate();
-console.log("Bytecode:", bytecode);
-
-// 仮想マシン実行
-const vm = new VirtualMachine(bytecode);
-const result = vm.execute();
-console.log("Execution Result:", result);
